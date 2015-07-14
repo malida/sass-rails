@@ -1,71 +1,75 @@
-require 'sass'
+require 'sassc'
 require 'sass/rails/cache_store'
 require 'sass/rails/helpers'
 require 'sprockets/sass_functions'
-require 'tilt'
+require "sprockets/version"
+require "sprockets/sass_template"
+require "sprockets/utils"
 
 module Sass
   module Rails
-    class SassTemplate < Tilt::Template
-      def self.default_mime_type
-        'text/css'
+    class SassTemplate < Sprockets::SassTemplate
+      module Sprockets3
+        def call(input)
+          context = input[:environment].context_class.new(input)
+
+          options = {
+            filename: input[:filename],
+            syntax: self.class.syntax,
+            load_paths: input[:environment].paths,
+            importer: SassC::Rails::Importer,
+            sprockets: {
+              context: context,
+              environment: input[:environment],
+              dependencies: context.metadata[:dependency_paths]
+            }
+          }.merge(config_options)
+
+          engine = ::SassC::Engine.new(input[:data], options)
+
+          css = Sprockets::Utils.module_include(::SassC::Script::Functions, @functions) do
+            engine.render
+          end
+
+          context.metadata.merge(data: css)
+        end
       end
 
-      def self.engine_initialized?
-        true
-      end
+      def config_options
+        opts = { style: sass_style }
 
-      def initialize_engine
-      end
-
-      def prepare
-      end
-
-      def syntax
-        :sass
-      end
-
-      def evaluate(context, locals, &block)
-        cache_store = CacheStore.new(context.environment)
-
-        options = {
-          :filename => eval_file,
-          :line => line,
-          :syntax => syntax,
-          :cache_store => cache_store,
-          :importer => importer_class.new(context.pathname.to_s),
-          :load_paths => context.environment.paths.map { |path| importer_class.new(path.to_s) },
-          :sprockets => {
-            :context => context,
-            :environment => context.environment
-          }
-        }
-
-        sass_config = context.sass_config.merge(options)
-
-        engine = ::Sass::Engine.new(data, sass_config)
-        css = engine.render
-
-        engine.dependencies.map do |dependency|
-          context.depend_on(dependency.options[:filename])
+        if Rails.application.config.sass.inline_source_maps
+          opts.merge!({
+            source_map_file: ".",
+            source_map_embed: true,
+            source_map_contents: true,
+          })
         end
 
-        css
-      rescue ::Sass::SyntaxError => e
-        context.__LINE__ = e.sass_backtrace.first[:line]
-        raise e
+        opts
       end
+
+      def sass_style
+        (Rails.application.config.sass.style || :expanded).to_sym
+      end
+    end
+
+    class ScssTemplate < SassTemplate
+      unless Sprockets::VERSION > "3.0.0"
+        self.default_mime_type = 'text/css'
+      end
+
+      # Sprockets 3
+      def self.syntax
+        :scss
+      end
+
+
 
       private
 
       def importer_class
         SassImporter
-      end
-    end
-
-    class ScssTemplate < SassTemplate
-      def syntax
-        :scss
       end
     end
   end

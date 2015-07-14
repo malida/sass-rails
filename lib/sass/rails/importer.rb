@@ -2,6 +2,7 @@ require 'active_support/deprecation/reporting'
 require 'sass'
 require 'sprockets/sass_importer'
 require 'tilt'
+require 'sassc'
 
 module Sass
   module Rails

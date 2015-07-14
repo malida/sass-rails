@@ -18,6 +18,7 @@ Gem::Specification.new do |s|
   s.add_dependency 'sprockets-rails', '>= 2.0', '< 4.0'
   s.add_dependency 'sprockets',       '>= 2.8', '< 4.0'
   s.add_dependency 'tilt',            '>= 1.1', '< 3'
+  s.add_dependency "sassc", "~> 1.4"
 
   s.add_development_dependency 'sqlite3'
 
